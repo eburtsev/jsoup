@@ -16,12 +16,14 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.StringWriter;
+import javax.xml.transform.TransformerException;
 
 /**
  * Helper class to transform a {@link org.jsoup.nodes.Document} to a {@link org.w3c.dom.Document org.w3c.dom.Document},
  * for integration with toolsets that use the W3C DOM.
- * <p/>
+ * <p>
  * This class is currently <b>experimental</b>, please provide feedback on utility and any problems experienced.
+ * </p>
  */
 public class W3CDom {
     protected DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -114,6 +116,8 @@ public class W3CDom {
 
     /**
      * Serialize a W3C document to a String.
+     * @param doc Document
+     * @return Document as string
      */
     public String asString(Document doc) {
         try {
@@ -124,7 +128,7 @@ public class W3CDom {
             Transformer transformer = tf.newTransformer();
             transformer.transform(domSource, result);
             return writer.toString();
-        } catch (Exception e) {
+        } catch (TransformerException e) {
             throw new IllegalStateException(e);
         }
     }

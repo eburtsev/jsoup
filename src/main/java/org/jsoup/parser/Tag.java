@@ -39,9 +39,10 @@ public class Tag {
 
     /**
      * Get a Tag by name. If not previously defined (unknown), returns a new generic tag, that can do anything.
-     * <p/>
+     * <p>
      * Pre-defined tags (P, DIV etc) will be ==, but unknown tags are not registered and will only .equals().
-     *
+     * </p>
+     * 
      * @param tagName Name of tag, e.g. "p". Case insensitive.
      * @return The tag, either defined or new generic.
      */
@@ -192,9 +193,7 @@ public class Tag {
         if (preserveWhitespace != tag.preserveWhitespace) return false;
         if (selfClosing != tag.selfClosing) return false;
         if (formList != tag.formList) return false;
-        if (formSubmit != tag.formSubmit) return false;
-
-        return true;
+        return formSubmit == tag.formSubmit;
     }
 
     @Override
@@ -212,6 +211,7 @@ public class Tag {
         return result;
     }
 
+    @Override
     public String toString() {
         return tagName;
     }

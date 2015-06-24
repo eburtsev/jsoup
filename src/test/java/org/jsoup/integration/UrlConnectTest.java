@@ -12,14 +12,13 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.*;
 
 /**
  Tests the URL connection. Not enabled by default, so tests don't require network connection.
@@ -27,6 +26,8 @@ import static org.junit.Assert.assertTrue;
  @author Jonathan Hedley, jonathan@hedley.net */
 @Ignore // ignored by default so tests don't require network access. comment out to enable.
 public class UrlConnectTest {
+    private static final String WEBSITE_WITH_INVALID_CERTIFICATE = "https://certs.cac.washington.edu/CAtest/";
+    private static final String WEBSITE_WITH_SNI = "https://jsoup.org/";
     private static String echoURL = "http://direct.infohound.net/tools/q.pl";
 
     @Test
@@ -56,13 +57,13 @@ public class UrlConnectTest {
     
     @Test
     public void exceptOnUnknownContentType() {
-        String url = "http://jsoup.org/rez/osi_logo.png"; // not text/* but image/png, should throw
+        String url = "http://direct.jsoup.org/rez/osi_logo.png"; // not text/* but image/png, should throw
         boolean threw = false;
         try {
             Document doc = Jsoup.parse(new URL(url), 3000);
         } catch (UnsupportedMimeTypeException e) {
             threw = true;
-            assertEquals("org.jsoup.UnsupportedMimeTypeException: Unhandled content type. Must be text/*, application/xml, or application/xhtml+xml. Mimetype=image/png, URL=http://jsoup.org/rez/osi_logo.png", e.toString());
+            assertEquals("org.jsoup.UnsupportedMimeTypeException: Unhandled content type. Must be text/*, application/xml, or application/xhtml+xml. Mimetype=image/png, URL=http://direct.jsoup.org/rez/osi_logo.png", e.toString());
             assertEquals(url, e.getUrl());
             assertEquals("image/png", e.getMimeType());
         } catch (IOException e) {
@@ -218,6 +219,34 @@ public class UrlConnectTest {
     }
 
     @Test
+    public void ignores500tExceptionIfSoConfigured() throws IOException {
+        Connection con = Jsoup.connect("http://direct.infohound.net/tools/500.pl").ignoreHttpErrors(true);
+        Connection.Response res = con.execute();
+        Document doc = res.parse();
+        assertEquals(500, res.statusCode());
+        assertEquals("Application Error", res.statusMessage());
+        assertEquals("Woops", doc.select("h1").first().text());
+    }
+
+    @Test
+    public void ignores500NoWithContentExceptionIfSoConfigured() throws IOException {
+        Connection con = Jsoup.connect("http://direct.infohound.net/tools/500-no-content.pl").ignoreHttpErrors(true);
+        Connection.Response res = con.execute();
+        Document doc = res.parse();
+        assertEquals(500, res.statusCode());
+        assertEquals("Application Error", res.statusMessage());
+    }
+
+    @Test
+    public void ignores200NoWithContentExceptionIfSoConfigured() throws IOException {
+        Connection con = Jsoup.connect("http://direct.infohound.net/tools/200-no-content.pl").ignoreHttpErrors(true);
+        Connection.Response res = con.execute();
+        Document doc = res.parse();
+        assertEquals(200, res.statusCode());
+        assertEquals("All Good", res.statusMessage());
+    }
+
+    @Test
     public void doesntRedirectIfSoConfigured() throws IOException {
         Connection con = Jsoup.connect("http://direct.infohound.net/tools/302.pl").followRedirects(false);
         Connection.Response res = con.execute();
@@ -296,6 +325,63 @@ public class UrlConnectTest {
         assertEquals(196577, mediumRes.parse().text().length());
         assertEquals(actualDocText, largeRes.parse().text().length());
         assertEquals(actualDocText, unlimitedRes.parse().text().length());
+    }
+
+    /**
+     * Verify that security disabling feature works properly.
+     * <p/>
+     * 1. try to hit url with invalid certificate and evaluate that exception is thrown
+     *
+     * @throws Exception
+     */
+    @Test(expected = IOException.class)
+    public void testUnsafeFail() throws Exception {
+        String url = WEBSITE_WITH_INVALID_CERTIFICATE;
+        Jsoup.connect(url).execute();
+    }
+
+
+    /**
+     * Verify that requests to websites with SNI fail on jdk 1.6
+     * <p/>
+     * read for more details:
+     * http://en.wikipedia.org/wiki/Server_Name_Indication
+     *
+     * Test is ignored independent from others as it requires JDK 1.6
+     * @throws Exception
+     */
+    @Test(expected = IOException.class)
+    public void testSNIFail() throws Exception {
+        String url = WEBSITE_WITH_SNI;
+        Jsoup.connect(url).execute();
+    }
+
+    /**
+     * Verify that requests to websites with SNI pass
+     * <p/>
+     * <b>NB!</b> this test is FAILING right now on jdk 1.6
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testSNIPass() throws Exception {
+        String url = WEBSITE_WITH_SNI;
+        Connection.Response defaultRes = Jsoup.connect(url).validateTLSCertificates(false).execute();
+        assertThat(defaultRes.statusCode(), is(200));
+    }
+
+    /**
+     * Verify that security disabling feature works properly.
+     * <p/>
+     * 1. disable security checks and call the same url to verify that content is consumed correctly
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testUnsafePass() throws Exception {
+        String url = WEBSITE_WITH_INVALID_CERTIFICATE;
+        Connection.Response defaultRes = Jsoup.connect(url).validateTLSCertificates(false).execute();
+        assertThat(defaultRes.statusCode(), is(200));
     }
 
     @Test

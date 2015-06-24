@@ -21,6 +21,7 @@ public final class DataUtil {
     private static final Pattern charsetPattern = Pattern.compile("(?i)\\bcharset=\\s*(?:\"|')?([^\\s,;\"']*)");
     static final String defaultCharset = "UTF-8"; // used if not found in header or meta charset
     private static final int bufferSize = 0x20000; // ~130K.
+    private static final int UNICODE_BOM = 0xFEFF;
     private static final char[] mimeBoundaryChars =
             "-_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
     static final int boundaryLength = 32;
@@ -93,20 +94,18 @@ public final class DataUtil {
             doc = parser.parseInput(docData, baseUri);
             Element meta = doc.select("meta[http-equiv=content-type], meta[charset]").first();
             if (meta != null) { // if not found, will keep utf-8 as best attempt
-                String foundCharset;
+                String foundCharset = null;
                 if (meta.hasAttr("http-equiv")) {
                     foundCharset = getCharsetFromContentType(meta.attr("content"));
-                    if (foundCharset == null && meta.hasAttr("charset")) {
-                        try {
-                            if (Charset.isSupported(meta.attr("charset"))) {
-                                foundCharset = meta.attr("charset");
-                            }
-                        } catch (IllegalCharsetNameException e) {
-                            foundCharset = null;
+                }
+                if (foundCharset == null && meta.hasAttr("charset")) {
+                    try {
+                        if (Charset.isSupported(meta.attr("charset"))) {
+                            foundCharset = meta.attr("charset");
                         }
+                    } catch (IllegalCharsetNameException e) {
+                        foundCharset = null;
                     }
-                } else {
-                    foundCharset = meta.attr("charset");
                 }
 
                 if (foundCharset != null && foundCharset.length() != 0 && !foundCharset.equals(defaultCharset)) { // need to re-decode
@@ -122,7 +121,7 @@ public final class DataUtil {
             docData = Charset.forName(charsetName).decode(byteData).toString();
         }
         // UTF-8 BOM indicator. takes precedence over everything else. rarely used. re-decodes incase above decoded incorrectly
-        if (docData.length() > 0 && docData.charAt(0) == 65279) {
+        if (docData.length() > 0 && docData.charAt(0) == UNICODE_BOM) {
             byteData.rewind();
             docData = Charset.forName(defaultCharset).decode(byteData).toString();
             docData = docData.substring(1);
@@ -163,8 +162,7 @@ public final class DataUtil {
             }
             outStream.write(buffer, 0, read);
         }
-        ByteBuffer byteData = ByteBuffer.wrap(outStream.toByteArray());
-        return byteData;
+        return ByteBuffer.wrap(outStream.toByteArray());
     }
 
     static ByteBuffer readToByteBuffer(InputStream inStream) throws IOException {
@@ -182,6 +180,10 @@ public final class DataUtil {
             if (randomAccessFile != null)
                 randomAccessFile.close();
         }
+    }
+
+    static ByteBuffer emptyByteBuffer() {
+        return ByteBuffer.allocate(0);
     }
 
     /**
